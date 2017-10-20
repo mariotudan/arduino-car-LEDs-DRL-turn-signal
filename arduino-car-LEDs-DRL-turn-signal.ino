@@ -11,13 +11,21 @@
 #define LEDS 30
 #define TAIL 16
 #define TAIL_REVERSE 15
-#define TURN_INTERVAL 7
+#define TURN_INTERVAL 5
 #define INITIALIZATION_INTERVAL 15
-#define MIDDLE_PHASE_DURATION 10 // times TURN_INTERVAL
+#define MIDDLE_PHASE_DURATION 44 // times TURN_INTERVAL
 #define FIX_INTERVAL 500
+
 #define BLINKING_OFF_TIME 600
-#define BOTH_TURN_SIGNALS_TOLERATION 100
-#define ANALOG_MIN_VALUE 10
+#define BLINKING_EMP_FIX_TIME 100 // EMP or voltage spike fix
+#define BOTH_TURN_SIGNALS_TOLERATION 400
+//#define BLINKING_OFF_TIME 1
+//#define BLINKING_EMP_FIX_TIME 1 // EMP or voltage spike fix
+//#define BOTH_TURN_SIGNALS_TOLERATION 0
+
+#define TURN_SIGNAL_DELAY 0
+#define ANALOG_MIN_VALUE_DRL 200
+#define ANALOG_MIN_VALUE_TURN 200
 
 Adafruit_NeoPixel stripLeft = Adafruit_NeoPixel(LEDS, STRIP_LEFT_PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel stripRight = Adafruit_NeoPixel(LEDS, STRIP_RIGHT_PIN, NEO_GRB + NEO_KHZ800);
@@ -41,6 +49,11 @@ unsigned long rightTurnOffMillis = 0;
 bool leftTurnOffStarted = false;
 bool rightTurnOffStarted = false;
 
+unsigned long leftTurnOnMillis = 0;
+unsigned long rightTurnOnMillis = 0;
+bool leftTurnOnStarted = false;
+bool rightTurnOnStarted = false;
+
 int turnUp = 0 - TAIL;
 int turnDown = LEDS + TAIL;
 
@@ -59,9 +72,8 @@ struct RGB {
   int b;
 };
 RGB orange = {255, 79, 0};
-// TODO calibrate whites
-RGB whiteDay = {255, 230, 255};
-RGB whiteNight = {255, 200, 100};
+RGB whiteDay = {255, 200, 255};
+RGB whiteNight = {255, 160, 90};
 RGB white = whiteDay;
 RGB loopWhite = white;
 
@@ -97,7 +109,7 @@ void loop() {
       //Serial.write("RESETING\n");
       resetPhase();
     }
-  } else  if (turnEnabled && (leftTurnSignal || rightTurnSignal || turnUp + TAIL > 0 || turnDown - TAIL < LEDS)) {
+  } else  if (/*TEMP false &*/ turnEnabled && (leftTurnSignal || rightTurnSignal || turnUp + TAIL > 0 || turnDown - TAIL < LEDS)) {
     if (currentMillis - lastMillis >= TURN_INTERVAL) {
       lastMillis = currentMillis;
       // on phase start
@@ -186,8 +198,7 @@ void readSwitchesState() {
 
 void checkDRL() {
   bool lastDRLOn = DRLOn;
-  // TODO revert to non invert
-  DRLOn = !(analogRead(DRL_PIN) > ANALOG_MIN_VALUE);
+  DRLOn = analogRead(DRL_PIN) > ANALOG_MIN_VALUE_DRL;
   if (lastDRLOn != DRLOn && DRLSwitchOn) {
     //Serial.write("DRL changed\n");
     if (DRLOn) {
@@ -207,8 +218,8 @@ void readTurnSignalInputs(bool doubleCheck) {
   bool lastLeftTurnSignal = leftTurnSignal;
   bool lastRightTurnSignal = rightTurnSignal;
 
-  bool leftTurnSignalInput = analogRead(LEFT_TURN_SIGNAL_PIN) > ANALOG_MIN_VALUE;
-  bool rightTurnSignalInput = analogRead(RIGHT_TURN_SIGNAL_PIN) > ANALOG_MIN_VALUE;
+  bool leftTurnSignalInput = analogRead(LEFT_TURN_SIGNAL_PIN) > ANALOG_MIN_VALUE_TURN;
+  bool rightTurnSignalInput = analogRead(RIGHT_TURN_SIGNAL_PIN) > ANALOG_MIN_VALUE_TURN;
 
   unsigned long currentMillis = millis();
 
@@ -218,12 +229,35 @@ void readTurnSignalInputs(bool doubleCheck) {
       leftTurnOffMillis = millis();
     } else if (currentMillis - leftTurnOffMillis >= BLINKING_OFF_TIME) {
       leftTurnOffStarted = false;
+      /*if (leftTurnSignal == true) {
+        String text = "";
+        text += millis();
+        text += ";\n";
+        Serial.print(text);
+      }*/
       leftTurnSignal = false;
+    }
+  } else if (leftTurnSignalInput && !leftTurnSignal) {
+    if (!leftTurnOnStarted) {
+      leftTurnOnStarted = true;
+      leftTurnOnMillis = millis();
+    }
+    else if (currentMillis - leftTurnOnMillis >= BLINKING_EMP_FIX_TIME) {
+      leftTurnOnStarted = false;
+      /*if (leftTurnSignal == false) {
+        String text = "";
+        text += millis();
+        text += ";";
+        Serial.print(text);
+      }*/
+      leftTurnSignal = true;
     }
   } else {
     leftTurnOffStarted = false;
-    leftTurnSignal = leftTurnSignalInput;
+    leftTurnOnStarted = false;
+    //leftTurnSignal = leftTurnSignalInput;
   }
+
   if (!rightTurnSignalInput && rightTurnSignal) {
     if (!rightTurnOffStarted) {
       rightTurnOffStarted = true;
@@ -232,10 +266,25 @@ void readTurnSignalInputs(bool doubleCheck) {
       rightTurnOffStarted = false;
       rightTurnSignal = false;
     }
+  } else if (rightTurnSignalInput && !rightTurnSignal) {
+    if (!rightTurnOnStarted) {
+      rightTurnOnStarted = true;
+      rightTurnOnMillis = millis();
+    }
+    else if (currentMillis - rightTurnOnMillis >= BLINKING_EMP_FIX_TIME) {
+      rightTurnOnStarted = false;
+      rightTurnSignal = true;
+    }
   } else {
     rightTurnOffStarted = false;
-    rightTurnSignal = rightTurnSignalInput;
+    rightTurnOnStarted = false;
+    //rightTurnSignal = rightTurnSignalInput;
   }
+
+  if (!doubleCheck && (!lastLeftTurnSignal && leftTurnSignal || !lastRightTurnSignal && rightTurnSignal)) {
+    delay(TURN_SIGNAL_DELAY);
+  }
+
   if (doubleCheck && (leftTurnSignal || rightTurnSignal) && !lastLeftTurnSignal && !lastRightTurnSignal && isIdleStateActive()) {
     delay(BOTH_TURN_SIGNALS_TOLERATION);
     readTurnSignalInputs(false);
