@@ -8,7 +8,7 @@
 #define STRIP_RIGHT_PIN 6
 #define TURN_SWITCH_PIN 8
 #define DRL_SWITCH_PIN 9
-#define LEDS 30
+#define LEDS 72
 #define TURN_ON_INTERVAL 4
 #define TURN_OFF_INTERVAL 2
 #define INITIALIZATION_INTERVAL 15
@@ -17,6 +17,7 @@
 #define BOTH_TURN_SIGNALS_TOLERATION 20
 #define ANALOG_MIN_VALUE_DRL 200
 #define ANALOG_MIN_VALUE_TURN 100
+#define GROUP 3 // 1, 2, 3
 
 Adafruit_NeoPixel stripLeft = Adafruit_NeoPixel(LEDS, STRIP_LEFT_PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel stripRight = Adafruit_NeoPixel(LEDS, STRIP_RIGHT_PIN, NEO_GRB + NEO_KHZ800);
@@ -35,17 +36,18 @@ unsigned long lastRightFixMillis = 0;
 
 unsigned long lastTurnSignalOnMillis = 0;
 
-struct RGB {
-  int r;
-  int g;
-  int b;
+struct WWA {
+  int cool;
+  int warm;
+  int amber;
 };
 
-RGB orange = {255, 79, 0};
-RGB whiteDay = {255, 200, 255};
-RGB whiteNight = {255, 160, 90};
-RGB colorOFF = {0, 0, 0};
-RGB white = whiteDay;
+WWA colorOFF = {0, 0, 0};
+WWA orangeON = {0, 0, 255};
+WWA orange = orangeON;
+WWA whiteDay = colorOFF;
+WWA whiteNight = {255, 255, 0};
+WWA white = whiteDay;
 
 void setup() {
   stripLeft.setBrightness(BRIGHTNESS);
@@ -76,10 +78,11 @@ void loop() {
 void initialize() {
   if (initialized == false) {
     initialized = true;
-    for (int led = LEDS - 1; led >= 0; led--) {
+    /*for (int led = LEDS - 1; led >= GROUP - 1; led -= GROUP) {
       setStripPixelColor(white, led, true, true);
       delay(INITIALIZATION_INTERVAL);
-    }
+      }*/
+    setStripPixelsColor(white, true, true, INITIALIZATION_INTERVAL);
   }
 }
 
@@ -113,8 +116,10 @@ void checkDRL() {
   }
   if (DRLOn) {
     white = whiteDay;
+    orange = colorOFF;
   } else {
     white = whiteNight;
+    orange = orangeON;
   }
 }
 
@@ -151,10 +156,11 @@ void readTurnSignalInputs(bool doubleCheck) {
 }
 
 void turnUpPhase() {
-  for (int led = LEDS - 1; led >= 0; led--) {
+  /*for (int led = LEDS - 1; led >= GROUP - 1; led -= GROUP) {
     setStripPixelColor(orange, led, leftTurnSignal, rightTurnSignal);
     delay(TURN_ON_INTERVAL);
-  }
+    }*/
+  setStripPixelsColor(orange, leftTurnSignal, rightTurnSignal, TURN_ON_INTERVAL);
 }
 
 void middlePhase() {
@@ -162,10 +168,11 @@ void middlePhase() {
 }
 
 void turnDownPhase() {
-  for (int led = LEDS - 1; led >= 0; led--) {
+  /*for (int led = LEDS - 1; led >= GROUP - 1; led -= GROUP) {
     setStripPixelColor(colorOFF, led, leftTurnSignal, rightTurnSignal);
     delay(TURN_OFF_INTERVAL);
-  }
+    }*/
+  setStripPixelsColor(colorOFF, leftTurnSignal, rightTurnSignal, TURN_OFF_INTERVAL);
 }
 
 void endPhase() {
@@ -175,21 +182,31 @@ void endPhase() {
   rightTurnSignal = false;
 }
 
-void setStripPixelColor(RGB color, int led, bool changeLeft, bool changeRight) {
+void setStripPixelsColor(WWA color, bool changeLeft, bool changeRight, int delayTime) {
+  for (int led = LEDS - 1; led >= GROUP - 1; led -= GROUP) {
+    for (int singleLed = GROUP - 1; singleLed >= 0; singleLed--) {
+      setStripPixelColor(color, singleLed, changeLeft, changeRight, false);
+    }
+    refreshStrip(changeLeft, changeRight);
+    delay(delayTime);
+  }
+}
+
+void setStripPixelColor(WWA color, int led, bool changeLeft, bool changeRight) {
   setStripPixelColor(color, led, changeLeft, changeRight, true);
 }
 
-void setStripPixelColor(RGB color, int led, bool changeLeft, bool changeRight, bool refresh) {
+void setStripPixelColor(WWA color, int led, bool changeLeft, bool changeRight, bool refresh) {
   if (changeLeft) {
-    stripLeft.setPixelColor(led, color.r, color.g, color.b);
+    stripLeft.setPixelColor(led, color.amber, color.cool, color.warm);
   }
   if (changeRight) {
-    stripRight.setPixelColor(led, color.r, color.g, color.b);
+    stripRight.setPixelColor(led, color.amber, color.cool, color.warm);
   }
   if (refresh) refreshStrip(changeLeft, changeRight);
 }
 
-void setStripColor(RGB color, bool changeLeft, bool changeRight) {
+void setStripColor(WWA color, bool changeLeft, bool changeRight) {
   for (int led = 0; led < LEDS; led++) {
     setStripPixelColor(color, led, changeLeft, changeRight, false);
   }
