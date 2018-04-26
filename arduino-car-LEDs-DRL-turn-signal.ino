@@ -208,6 +208,7 @@ void setStripPixelColor(WWA color, int led, bool changeLeft, bool changeRight) {
 }
 
 void setStripPixelColor(WWA color, int led, bool changeLeft, bool changeRight, bool refresh) {
+  if (led < 0 || led >= LEDS) return;
   if (changeLeft) {
     stripLeft.setPixelColor(led, color.amber, color.cool, color.warm);
   }
