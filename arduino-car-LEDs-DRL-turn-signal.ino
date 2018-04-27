@@ -11,14 +11,14 @@
 #define LEDS 72
 #define TURN_ON_INTERVAL 4
 #define TURN_OFF_INTERVAL 2
-#define INITIALIZATION_INTERVAL 4
+#define INITIALIZATION_INTERVAL 8
 #define MIDDLE_PHASE_DURATION 150
 #define FIX_INTERVAL 1200
 #define BOTH_TURN_SIGNALS_TOLERATION 20
 #define ANALOG_MIN_VALUE_DRL 200
 #define ANALOG_MIN_VALUE_TURN 100
 #define GROUP 4 // number of LEDs animating together
-#define INITIALIZATION_GROUP 16 // number of LEDs moving during initialization
+#define INITIALIZATION_GROUP 32 // number of LEDs moving during initialization
 
 Adafruit_NeoPixel stripLeft = Adafruit_NeoPixel(LEDS, STRIP_LEFT_PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel stripRight = Adafruit_NeoPixel(LEDS, STRIP_RIGHT_PIN, NEO_GRB + NEO_KHZ800);
@@ -172,13 +172,13 @@ void endPhase() {
 }
 
 void initializeAnimationUp() {
-  for (int led = LEDS + INITIALIZATION_GROUP - 1; led >= -GROUP; led -= GROUP) {
+  for (int led = LEDS + 2 * INITIALIZATION_GROUP - 1; led >= -GROUP; led -= GROUP) {
     setPixelGroupColor(led);
   }
 }
 
 void initializeAnimationDown() {
-  for (int led = 0; led < LEDS + INITIALIZATION_GROUP + GROUP; led += GROUP) {
+  for (int led = 0; led < LEDS + 2 * INITIALIZATION_GROUP + GROUP; led += GROUP) {
     setPixelGroupColor(led);
   }
 }
